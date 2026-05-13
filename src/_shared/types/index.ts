@@ -1,16 +1,19 @@
 /**
- * Public API for shared Zod schemas + inferred TypeScript types.
+ * @module shared/types
  *
- * Explicit named re-exports only — no `export * from` — so the public surface
- * is auditable and tree-shaking is reliable.
+ * Public API for shared Zod schemas and their inferred TypeScript types.
  *
- * Dependency order (no circular deps):
- *   user.schema  →  (no local deps)
- *   notifications.schema  →  (no local deps)
- *   kitchen.schema  →  (no local deps)
- *   item.schema  →  (no local deps)
- *   ai.schema  →  item.schema
- *   edge-functions.schema  →  ai.schema, kitchen.schema
+ * @remarks
+ * Named re-exports only — no `export * from` — so the public surface is
+ * auditable and tree-shaking is reliable.
+ *
+ * Intra-module dependency order (no circular dependencies):
+ * - `user.schema` — no local dependencies
+ * - `notifications.schema` — no local dependencies
+ * - `kitchen.schema` — no local dependencies
+ * - `item.schema` — no local dependencies
+ * - `ai.schema` — depends on `item.schema`
+ * - `edge-functions.schema` — depends on `ai.schema` and `kitchen.schema`
  */
 
 // ---------------------------------------------------------------------------

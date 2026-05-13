@@ -1,6 +1,9 @@
 /**
+ * @module errors
+ *
  * Public API for domain errors.
  *
+ * @remarks
  * Named re-exports only — no `export * from` — so the public surface is
  * auditable and tree-shaking is reliable.
  */

@@ -1,13 +1,14 @@
 /**
- * Typed domain errors for Gone Bad.
+ * @file Typed domain errors for Gone Bad.
  *
- * Design principles
- * -----------------
+ * @remarks
+ * Design principles:
+ *
  * 1. Each class uses a `readonly _tag` string-literal discriminant instead of
- *    `instanceof` checks.  Tags survive serialisation, module-instance
- *    boundaries, and work with exhaustive `switch` statements.
+ *    `instanceof` checks. Tags survive serialisation, module-instance boundaries,
+ *    and work with exhaustive `switch` statements.
  *
- * 2. Every class extends `Error` so stack traces, `instanceof Error`, and
+ * 2. Every class `extends Error` so stack traces, `instanceof Error`, and
  *    third-party tooling (Sentry, etc.) all work out of the box.
  *
  * 3. Domain-specific fields carry exactly the information a handler needs to
@@ -27,9 +28,9 @@ export class NotFoundError extends Error {
   readonly _tag = 'NotFoundError' as const
 
   constructor(
-    /** e.g. "Item", "Kitchen", "KitchenInvite" */
+    /** Resource type that could not be found, e.g. `'Item'`, `'Kitchen'`, `'KitchenInvite'`. */
     public readonly resource: string,
-    /** The id (or token) that was looked up */
+    /** Identifier or token that was looked up. */
     public readonly id: string,
   ) {
     super(`${resource} not found: ${id}`)
@@ -45,9 +46,9 @@ export class PermissionError extends Error {
   readonly _tag = 'PermissionError' as const
 
   constructor(
-    /** e.g. "delete_kitchen", "generate_invite" */
+    /** Action that was attempted, e.g. `'delete_kitchen'`, `'generate_invite'`. */
     public readonly action: string,
-    /** e.g. "owner", "editor" */
+    /** Minimum role required to perform the action, e.g. `'owner'`, `'editor'`. */
     public readonly requiredRole: string,
   ) {
     super(`Permission denied: '${action}' requires role '${requiredRole}'`)
@@ -63,9 +64,9 @@ export class RateLimitError extends Error {
   readonly _tag = 'RateLimitError' as const
 
   constructor(
-    /** The daily scan limit (ADR-009: 20) */
+    /** Daily scan cap that was exceeded (ADR-009: `20`). */
     public readonly limit: number,
-    /** When the counter resets (typically midnight UTC) */
+    /** Timestamp at which the counter resets, typically midnight UTC. */
     public readonly resetAt: Date,
   ) {
     super(`Rate limit of ${limit} scans/day exceeded. Resets at ${resetAt.toISOString()}`)
@@ -81,8 +82,9 @@ export class AIError extends Error {
   readonly _tag = 'AIError' as const
 
   constructor(
+    /** Human-readable description of the AI failure. */
     message: string,
-    /** Preserve the original Gemini / fetch error for logging */
+    /** Original Gemini or `fetch` error, preserved for logging. */
     public readonly originalError?: unknown,
   ) {
     super(message)
@@ -101,7 +103,7 @@ export class ModerationError extends Error {
   readonly _tag = 'ModerationError' as const
 
   constructor(
-    /** One of: NOT_FOOD | OBSCENE | BLURRY | NON_TRACKABLE */
+    /** Reason the image was rejected: `NOT_FOOD`, `OBSCENE`, `BLURRY`, or `NON_TRACKABLE`. */
     public readonly reason: ModerationReason,
   ) {
     super(`Image failed moderation: ${reason}`)
@@ -113,14 +115,16 @@ export class ModerationError extends Error {
 // StorageError
 // ---------------------------------------------------------------------------
 
+/** Storage operations that can fail and be wrapped in a {@link StorageError}. */
 export type StorageOperation = 'upload' | 'download' | 'delete' | 'signedUrl'
 
 export class StorageError extends Error {
   readonly _tag = 'StorageError' as const
 
   constructor(
+    /** Storage operation that failed. */
     public readonly operation: StorageOperation,
-    /** Preserve the original Supabase Storage / S3 error */
+    /** Original Supabase Storage error, preserved for logging. */
     public readonly originalError?: unknown,
   ) {
     super(`Storage operation '${operation}' failed`)
@@ -139,9 +143,9 @@ export class PushDeliveryError extends Error {
   readonly _tag = 'PushDeliveryError' as const
 
   constructor(
-    /** Expo push token that bounced — used to clean up push_tokens table */
+    /** Expo push token that bounced; used to clean up the `push_tokens` table. */
     public readonly token: string,
-    /** Expo receipt error message (e.g. "DeviceNotRegistered") */
+    /** Expo receipt error string, e.g. `'DeviceNotRegistered'`. */
     public readonly reason: string,
   ) {
     super(`Push notification delivery failed for token '${token}': ${reason}`)
@@ -157,7 +161,7 @@ export class InviteError extends Error {
   readonly _tag = 'InviteError' as const
 
   constructor(
-    /** One of: INVALID_TOKEN | EXPIRED | MAX_USES_REACHED | ALREADY_MEMBER */
+    /** Structured error code: `INVALID_TOKEN`, `EXPIRED`, `MAX_USES_REACHED`, or `ALREADY_MEMBER`. */
     public readonly code: HandleInviteErrorCode,
   ) {
     super(`Invite error: ${code}`)
@@ -169,6 +173,13 @@ export class InviteError extends Error {
 // DomainError — discriminated union of all typed errors
 // ---------------------------------------------------------------------------
 
+/**
+ * Discriminated union of every typed domain error in the application.
+ *
+ * @remarks
+ * Narrow with `e._tag` in a `switch` statement for exhaustive handling,
+ * or use the {@link isDomainError} guard to check an unknown caught value.
+ */
 export type DomainError =
   | NotFoundError
   | PermissionError
@@ -180,19 +191,26 @@ export type DomainError =
   | InviteError
 
 /**
- * Type-guard: is `e` one of our typed domain errors?
+ * Returns `true` when `e` is one of the application's typed domain errors.
  *
- * Useful in `catch (e)` blocks where TypeScript types `e` as `unknown`.
+ * @remarks
+ * Useful in `catch (e)` blocks where TypeScript widens the caught value to
+ * `unknown`. The check is structural — it looks for `instanceof Error` plus a
+ * string `_tag` property — so it works reliably across module boundaries and
+ * after serialisation.
+ *
+ * @param e - The value to test, typically the caught unknown in a `catch` block.
+ * @returns `true` if `e` is a {@link DomainError}; `false` otherwise.
  *
  * @example
  * ```ts
- * try { ... }
- * catch (e) {
+ * try {
+ *   await someOperation()
+ * } catch (e) {
  *   if (isDomainError(e)) {
  *     switch (e._tag) {
  *       case 'RateLimitError': return show429(e.resetAt)
  *       case 'PermissionError': return show403(e.action)
- *       // ...
  *     }
  *   }
  * }

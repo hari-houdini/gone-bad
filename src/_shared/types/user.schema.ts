@@ -11,9 +11,13 @@ export type AuthProvider = z.infer<typeof AuthProviderSchema>
 export type Platform = z.infer<typeof PlatformSchema>
 
 // ---------------------------------------------------------------------------
-// Locale regex  (BCP-47 subset: 'en', 'en-US', 'zh-Hant', etc.)
+// Locale regex
 // ---------------------------------------------------------------------------
 
+/**
+ * BCP-47 subset accepting language codes of the form `'en'`, `'en-US'`,
+ * `'zh-Hant'`, etc. Region subtags are optional.
+ */
 const localeRegex = /^[a-z]{2,3}(-[A-Z]{2,3})?$/
 
 // ---------------------------------------------------------------------------
@@ -31,7 +35,13 @@ export const UserRowSchema = z.object({
   deleted_at: z.iso.datetime().nullable(),
 })
 
-/** Client insert — id / created_at / updated_at are DB-generated. */
+/**
+ * Client-submitted insert shape.
+ *
+ * @remarks
+ * `id`, `created_at`, and `updated_at` are intentionally omitted — generated
+ * by the database on insert.
+ */
 export const UserInsertSchema = z.object({
   auth_uid: z.uuid(),
   auth_provider: AuthProviderSchema,
@@ -39,7 +49,13 @@ export const UserInsertSchema = z.object({
   locale: z.string().regex(localeRegex).nullable().default(null),
 })
 
-/** Only locale is client-updatable. */
+/**
+ * Client-updatable fields.
+ *
+ * @remarks
+ * Only `locale` may be updated by the client; all other user fields are
+ * either DB-managed or set by auth triggers.
+ */
 export const UserUpdateSchema = z
   .object({
     locale: z.string().regex(localeRegex).nullable(),
@@ -64,7 +80,7 @@ export const UserSettingsRowSchema = z.object({
 
 export const UserSettingsInsertSchema = z.object({
   user_id: z.uuid(),
-  /** Range 1–30 matches the UI stepper. */
+  /** Advance warning window in days; range `1–30` matches the Heads Up screen stepper. */
   notification_days_before: z.number().int().min(1).max(30).default(1),
   default_kitchen_id: z.uuid().nullable().default(null),
   locale: z.string().regex(localeRegex).nullable().default(null),
@@ -89,7 +105,10 @@ export type UserSettingsUpdate = z.infer<typeof UserSettingsUpdateSchema>
 export const PushTokenRowSchema = z.object({
   id: z.uuid(),
   user_id: z.uuid(),
-  /** Expo push token: ~40 chars; FCM token: up to ~200 chars. 512 is a safe ceiling. */
+  /**
+   * Push token string. Expo tokens are ~40 characters; FCM tokens can be up to
+   * ~200 characters. `512` is a safe upper bound for both.
+   */
   token: z.string().min(1).max(512),
   platform: PlatformSchema,
   device_id: z.string().nullable(),
@@ -117,12 +136,19 @@ export type PushTokenUpdate = z.infer<typeof PushTokenUpdateSchema>
 // ---------------------------------------------------------------------------
 // public.scan_rate_limits
 // ---------------------------------------------------------------------------
-// Server-only — written via increment_scan_count() RPC. No Insert/Update schemas.
 
+/**
+ * Row shape for the scan rate-limit ledger.
+ *
+ * @remarks
+ * Written exclusively by the `increment_scan_count()` RPC.
+ * No `InsertSchema` or `UpdateSchema` are defined; direct client writes are
+ * blocked by RLS.
+ */
 export const ScanRateLimitRowSchema = z.object({
   user_id: z.uuid(),
   scan_date: z.iso.date(),
-  /** ADR-009: 20 scans / user / day. */
+  /** Daily scan count for this user. ADR-009 cap: `20` scans per user per day. */
   scan_count: z.number().int().min(0).max(20),
 })
 

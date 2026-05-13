@@ -5,7 +5,14 @@ import { z } from 'zod'
 // ---------------------------------------------------------------------------
 
 export const KitchenRoleSchema = z.enum(['owner', 'editor', 'viewer'])
-/** Owners cannot be invited — they are always the creator. */
+
+/**
+ * Role subset valid for invite links.
+ *
+ * @remarks
+ * `'owner'` is excluded — owners are always the kitchen creator and can never
+ * be assigned via an invite.
+ */
 export const InviteRoleSchema = z.enum(['editor', 'viewer'])
 
 export type KitchenRole = z.infer<typeof KitchenRoleSchema>
@@ -25,8 +32,11 @@ export const KitchenRowSchema = z.object({
 })
 
 /**
- * `created_by` is intentionally omitted — always derived from the JWT
- * server-side. Never accept it from the client.
+ * Client-submitted insert shape.
+ *
+ * @remarks
+ * `created_by` is intentionally omitted — always derived from the
+ * authenticated JWT server-side to prevent impersonation.
  */
 export const KitchenInsertSchema = z.object({
   name: z.string().min(1).max(50).trim(),
@@ -56,7 +66,13 @@ export const KitchenMemberRowSchema = z.object({
   invited_by: z.uuid().nullable(),
 })
 
-/** Used by the `handle-invite` Edge Function; client only updates role / is_default. */
+/**
+ * Insert shape used by the `handle-invite` Edge Function.
+ *
+ * @remarks
+ * Direct client inserts are blocked by RLS. The client may only update
+ * `role` and `is_default` via the update schema.
+ */
 export const KitchenMemberInsertSchema = z.object({
   kitchen_id: z.uuid(),
   user_id: z.uuid(),
@@ -83,20 +99,24 @@ export type KitchenMemberUpdate = z.infer<typeof KitchenMemberUpdateSchema>
 export const KitchenInviteRowSchema = z.object({
   id: z.uuid(),
   kitchen_id: z.uuid(),
-  /** URL-safe base-64 token, always exactly 32 characters. */
+  /** URL-safe base-64 token, always exactly 32 characters long. */
   token: z.string().regex(/^[a-zA-Z0-9_-]{32}$/),
   created_by: z.uuid(),
   role: InviteRoleSchema,
   expires_at: z.iso.datetime(),
-  /** null means unlimited uses; min(1) because a 0-use invite is nonsense. */
+  /** Maximum number of redemptions; `null` means unlimited. `min(1)` because a zero-use invite is invalid. */
   max_uses: z.number().int().min(1).nullable(),
   used_count: z.number().int().min(0),
   created_at: z.iso.datetime(),
 })
 
 /**
- * `expires_at` is intentionally omitted — always set to NOW()+7days server-side.
- * Accepting it from the client would allow 100-year expiry abuse.
+ * Client-submitted insert shape.
+ *
+ * @remarks
+ * `expires_at` is intentionally omitted — the server always sets it to
+ * `NOW() + 7 days`. Accepting a client-supplied value would allow unbounded
+ * expiry abuse.
  */
 export const KitchenInviteInsertSchema = z.object({
   kitchen_id: z.uuid(),

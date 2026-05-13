@@ -4,8 +4,14 @@ import { z } from 'zod'
 // Enums
 // ---------------------------------------------------------------------------
 
-/** 14 canonical food categories. Single source of truth — also used by Gemini
- *  response validation and the Check It chip selector (via `src/constants/tags.ts`). */
+/**
+ * Fourteen canonical food category tags.
+ *
+ * @remarks
+ * This is the single source of truth for tag values. The Gemini response
+ * schema and the Check It chip selector both derive from this enum via
+ * `src/constants/tags.ts`.
+ */
 export const ItemTagSchema = z.enum([
   'Dairy',
   'Produce',
@@ -43,7 +49,7 @@ export const ItemRowSchema = z.object({
   description: z.string().max(500).nullable(),
   tags: z.array(ItemTagSchema),
   quantity: z.number().min(0),
-  /** Free-text unit: 'g', 'ml', 'kg', 'slices', etc. */
+  /** Free-text unit string, e.g. `'g'`, `'ml'`, `'kg'`, `'slices'`. */
   quantity_unit: z.string().max(20).nullable(),
   quantity_remaining: z.number().min(0).nullable(),
   purchase_date: z.iso.date().nullable(),
@@ -67,10 +73,13 @@ export const ItemRowSchema = z.object({
 })
 
 /**
- * Security omissions:
- * - `image_url` / `image_thumbnail_url` — populated by `process-image` Edge Function only
- * - `added_by` — always derived from the JWT server-side
- * - `status`, `used_at`, `wasted_at` — set by lifecycle RPCs, not direct insert
+ * Client-submitted insert shape.
+ *
+ * @remarks
+ * The following fields are intentionally omitted for security:
+ * - `image_url` and `image_thumbnail_url` — populated by the `process-image` Edge Function only.
+ * - `added_by` — always derived from the authenticated JWT server-side.
+ * - `status`, `used_at`, and `wasted_at` — managed exclusively by lifecycle RPCs.
  */
 export const ItemInsertSchema = z.object({
   kitchen_id: z.uuid(),
@@ -123,14 +132,20 @@ export const ItemEventRowSchema = z.object({
   item_id: z.uuid(),
   user_id: z.uuid().nullable(),
   event_type: ItemEventTypeSchema,
-  /** gt(0): zero-quantity events are meaningless and indicate a bug. */
+  /** Must be greater than zero; a zero-quantity event is meaningless and indicates a bug. */
   quantity: z.number().gt(0),
   quantity_unit: z.string().max(20).nullable(),
   note: z.string().max(300).nullable(),
   created_at: z.iso.datetime(),
 })
 
-/** `user_id` is omitted — always derived from the JWT server-side. */
+/**
+ * Client-submitted insert shape for item events.
+ *
+ * @remarks
+ * `user_id` is intentionally omitted — always derived from the authenticated
+ * JWT server-side.
+ */
 export const ItemEventInsertSchema = z.object({
   item_id: z.uuid(),
   event_type: ItemEventTypeSchema,
@@ -147,8 +162,13 @@ export type ItemEventInsert = z.infer<typeof ItemEventInsertSchema>
 // ---------------------------------------------------------------------------
 
 /**
- * Check It screen & The Label edit mode.
- * Image and barcode are managed by `uploadStore`, not this form.
+ * Client-side validation schema for the Check It screen and The Label edit mode.
+ *
+ * @remarks
+ * Image and barcode fields are managed separately by `uploadStore` and are
+ * not part of this form. Cross-field invariants are enforced via `superRefine`:
+ * - `expiry_date` must not precede `purchase_date`.
+ * - `expiry_date` must not precede `opened_date`.
  */
 export const CheckItFormSchema = z
   .object({
@@ -183,7 +203,13 @@ export const CheckItFormSchema = z
 
 export type CheckItForm = z.infer<typeof CheckItFormSchema>
 
-/** Quantity Modal — "All of it" / "Some of it" */
+/**
+ * Validation schema for the Quantity Modal ("All of it" / "Some of it").
+ *
+ * @remarks
+ * When `quantity_mode` is `'partial'`, `quantity` is required and must be
+ * greater than zero.
+ */
 export const QuantityActionSchema = z
   .object({
     event_type: ItemEventTypeSchema,

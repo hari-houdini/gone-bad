@@ -8,4 +8,5 @@ import { ItemTagSchema } from '@/shared/types'
  */
 export const ITEM_TAGS = ItemTagSchema.options satisfies readonly string[]
 
+/** Union type of all valid item tag strings, derived from {@link ITEM_TAGS}. */
 export type ItemTagOption = (typeof ITEM_TAGS)[number]

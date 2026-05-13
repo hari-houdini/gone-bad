@@ -11,14 +11,20 @@ export type NotificationAction = z.infer<typeof NotificationActionSchema>
 // ---------------------------------------------------------------------------
 // public.notification_log
 // ---------------------------------------------------------------------------
-// Written exclusively by the `send-notifications` Edge Function via cron.
-// No Insert/Update schemas — never written directly from the client.
 
+/**
+ * Row shape for the notification audit log.
+ *
+ * @remarks
+ * Written exclusively by the `send-notifications` Edge Function via `pg_cron`.
+ * No `InsertSchema` or `UpdateSchema` are defined; the client only reads this
+ * table.
+ */
 export const NotificationLogRowSchema = z.object({
   id: z.uuid(),
   item_id: z.uuid().nullable(),
   user_id: z.uuid().nullable(),
-  /** Hard 100-char limit matching the Gemini notification prompt spec (TDD §12.2). */
+  /** Notification body text. Hard `100`-character ceiling matches the Gemini prompt spec (TDD §12.2). */
   message: z.string().min(1).max(100),
   sent_at: z.iso.datetime(),
   action_taken: NotificationActionSchema.nullable(),
@@ -29,9 +35,15 @@ export type NotificationLogRow = z.infer<typeof NotificationLogRowSchema>
 // ---------------------------------------------------------------------------
 // public.daily_kitchen_cache
 // ---------------------------------------------------------------------------
-// Immutable per (kitchen_id, cache_date). A new day always means a new insert.
-// No UpdateSchema by design.
 
+/**
+ * Row shape for the per-kitchen daily fun-fact cache.
+ *
+ * @remarks
+ * Immutable per `(kitchen_id, cache_date)` — each new calendar day inserts a
+ * fresh row. No `UpdateSchema` by design; stale cache entries are never
+ * modified.
+ */
 export const DailyKitchenCacheRowSchema = z.object({
   id: z.uuid(),
   kitchen_id: z.uuid(),
@@ -57,12 +69,20 @@ export type DailyKitchenCacheInsert = z.infer<typeof DailyKitchenCacheInsertSche
 // Expo push payload  (sent by `send-notifications` to Expo's push service)
 // ---------------------------------------------------------------------------
 
+/**
+ * Payload shape sent to Expo's push notification service.
+ *
+ * @remarks
+ * Both `title` and `categoryId` are literals — any deviation indicates a
+ * configuration bug. `categoryId` must match the category registered in the
+ * Expo notifications plugin configuration.
+ */
 export const ExpoPushPayloadSchema = z.object({
   to: z.string().min(1).max(512),
-  /** Hard constant — any deviation from 'Gone Bad' is a bug. */
+  /** Always `'Gone Bad'`; any other value is a configuration bug. */
   title: z.literal('Gone Bad'),
   body: z.string().min(1).max(100),
-  /** Hard constant — must match the Expo notification category registered in the app. */
+  /** Always `'EXPIRY_ALERT'`; must match the registered Expo notification category. */
   categoryId: z.literal('EXPIRY_ALERT'),
   data: z.object({
     item_id: z.uuid(),
