@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Gone Bad — Claude Code Guidelines
+  Version: 1.0.0
+  Date: 13 May 2026
+
+  PURPOSE
+  This document is the authoritative reference for Claude when generating,
+  reviewing, or modifying code in this repository. All rules are binding.
+  When in doubt, ask rather than assume. Never invent new patterns not listed here.
+
+  COMPANION DOCUMENTS
+  - .claude/docs/gone-bad-tdd.md         (product + database spec)
+  - .claude/docs/architecture-prd.md     (architecture + naming decisions)
+-->
+
+<guidelines>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       1. PROJECT IDENTITY
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <project>
+    <name>Gone Bad</name>
+    <type>Cross-platform mobile app (iOS + Android)</type>
+    <framework>Expo SDK 52, Expo Router v4</framework>
+    <language>TypeScript 5.x (strict mode, no any)</language>
+    <backend>Supabase (PostgreSQL 15, Edge Functions Deno runtime)</backend>
+    <package-manager>pnpm</package-manager>
+    <test-runner>Vitest</test-runner>
+    <e2e-runner>Maestro</e2e-runner>
+  </project>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       2. CORE ARCHITECTURE
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <architecture>
+
+    <pattern name="hexagonal">
+      <description>
+        Ports and Adapters. Domain logic has ZERO knowledge of any external
+        technology. External dependencies are declared as TypeScript interfaces
+        (ports) in src/_shared/ports/. Concrete implementations (adapters) live
+        in supabase/functions/_shared/adapters/. Effect Layers provide adapters
+        to the domain at runtime.
+      </description>
+      <rule>Never import a Supabase, Gemini, or Expo SDK inside src/_shared/domain/.</rule>
+      <rule>Never import an adapter directly in a service. Request the port via Effect.service().</rule>
+    </pattern>
+
+    <pattern name="tactical-ddd">
+      <description>
+        Value Objects, Domain Services, Factories, and Specifications in
+        src/_shared/domain/. No Aggregates, no Domain Events in v1.
+        Pure TypeScript — no React, no Deno, no runtime deps.
+      </description>
+      <value-objects>
+        <vo name="ExpiryDate"   file="src/_shared/domain/value-objects/expiry-date.value-object.ts" />
+        <vo name="Quantity"     file="src/_shared/domain/value-objects/quantity.value-object.ts" />
+        <vo name="ItemTags"     file="src/_shared/domain/value-objects/item-tags.value-object.ts" />
+        <vo name="KitchenRole"  file="src/_shared/domain/value-objects/kitchen-role.value-object.ts" />
+        <vo name="InviteToken"  file="src/_shared/domain/value-objects/invite-token.value-object.ts" />
+      </value-objects>
+      <domain-services>
+        <ds name="ItemLifecycleService"       file="src/_shared/domain/services/item-lifecycle.service.ts" />
+        <ds name="KitchenPermissionService"   file="src/_shared/domain/services/kitchen-permission.service.ts" />
+        <ds name="ScanQuotaService"           file="src/_shared/domain/services/scan-quota.service.ts" />
+        <ds name="ExpiryEstimationService"    file="src/_shared/domain/services/expiry-estimation.service.ts" />
+        <ds name="NotificationScheduleService" file="src/_shared/domain/services/notification-schedule.service.ts" />
+      </domain-services>
+      <rule>Business rules (e.g. "depleted quantity triggers full-use") live in Domain Services, not in hooks, queries, or handlers.</rule>
+      <rule>Value Objects are immutable. Never mutate a Value Object; return a new one.</rule>
+    </pattern>
+
+    <pattern name="effect">
+      <description>
+        Effect (@effect/effect) is used exclusively in:
+        1. Supabase Edge Functions (supabase/functions/)
+        2. src/_shared/domain/ (typed errors, pure Effect computations)
+        NOT on the React Native client — no Effect runtime in the Expo bundle.
+      </description>
+      <rule>Every Edge Function service function returns Effect.Effect&lt;A, E, R&gt; with explicit type parameters.</rule>
+      <rule>Never use try/catch to handle Effect errors. Use Effect.catchTag, Effect.catchAll, or Effect.match.</rule>
+      <rule>Every port interface method returns an Effect, not a Promise.</rule>
+      <rule>Use Effect.service(PortTag) to request dependencies. Never instantiate an adapter directly inside a service.</rule>
+      <rule>Retry policy for external API calls: Effect.retry(Schedule.exponential("200 millis").pipe(Schedule.upTo(3))).</rule>
+      <rule>Use Effect.Stream for The Haul parallel processing (max concurrency: 5).</rule>
+      <rule>Use Effect.Scope for temp file lifecycle management in the upload pipeline.</rule>
+    </pattern>
+
+    <pattern name="xstate">
+      <description>
+        XState v5 (actor model) is used ONLY for the item lifecycle state machine.
+        Zustand handles all other state (auth, kitchen, upload, settings).
+      </description>
+      <machine name="itemMachine" file="src/features/item/item.machine.ts">
+        <states>active, used, wasted, expired</states>
+        <events>USE(quantity), WASTE(quantity), EXPIRE</events>
+      </machine>
+      <rule>Do not use XState for auth flow, upload pipeline state, or settings. Use Zustand stores for those.</rule>
+      <rule>Spawn the item actor inside useItemActor(itemId) hook. Do not store XState actors in Zustand.</rule>
+      <rule>XState guards validate transitions. Illegal transitions must not silently fail — throw a typed error.</rule>
+    </pattern>
+
+    <pattern name="cqrs-convention">
+      <description>
+        Lightweight CQRS by naming convention only. No command bus.
+        Commands live in *.service.ts. Queries live in *.query.ts.
+      </description>
+      <rule>Functions that mutate state are Commands: AddItemCommand, MarkItemUsedCommand, InviteUserCommand.</rule>
+      <rule>Functions that only read state are Queries: GetStashQuery, GetDashboardAggregates.</rule>
+      <rule>Never put a mutation inside a *.query.ts file.</rule>
+      <rule>Never put a SELECT-only operation inside a *.service.ts file that is designated for commands.</rule>
+    </pattern>
+
+    <pattern name="expo-router-thin-shells">
+      <description>
+        app/ contains Expo Router route files only. Every route file is a thin shell:
+        it imports one screen component and re-exports it as default.
+        Maximum 8 lines per app/ file. No logic, no hooks, no stores.
+      </description>
+      <rule>app/ files may only import from src/features/.</rule>
+      <rule>Route params are extracted in the app/ file and passed as props to the screen component.</rule>
+      <example>
+        <!-- app/(app)/stash/[id].tsx -->
+        import { ItemLabelScreen } from '@/features/item'
+        import { useLocalSearchParams } from 'expo-router'
+        export default function ItemRoute() {
+          const { id } = useLocalSearchParams&lt;{ id: string }&gt;()
+          return &lt;ItemLabelScreen itemId={id} /&gt;
+        }
+      </example>
+    </pattern>
+
+  </architecture>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       3. FILE NAMING CONVENTION
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <file-naming>
+
+    <format>&lt;domain&gt;.&lt;subtype?&gt;.&lt;type&gt;.&lt;extension&gt;</format>
+
+    <rules>
+      <rule id="FN-01">domain is kebab-case. Can be compound: kitchen-members, item-card, expiry-date, analyse-image.</rule>
+      <rule id="FN-02">subtype is optional. Used in: (a) test files to identify what is being tested; (b) disambiguation when a pod has multiple files of the same type.</rule>
+      <rule id="FN-03">type must be exactly one value from the Type Vocabulary section. No invented types.</rule>
+      <rule id="FN-04">extension is .tsx for files containing JSX; .ts for everything else.</rule>
+      <rule id="FN-05">All segments are kebab-case. No camelCase or PascalCase in file names.</rule>
+      <rule id="FN-06">Test files: .test is always the final segment before the extension. Example: kitchen.hook.test.ts</rule>
+      <rule id="FN-07">index.ts is reserved exclusively for public API barrels. Never use index as a domain name.</rule>
+      <rule id="FN-08">.spec suffix means Specification Pattern predicate. It is NOT a Vitest test file. Use .test for Vitest tests.</rule>
+      <rule id="FN-09">Prefer compound domain names (kitchen-members.component.tsx) over subtype disambiguation (kitchen.members.component.tsx) for source files. Reserve subtype for test files and edge cases.</rule>
+    </rules>
+
+  </file-naming>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       4. TYPE VOCABULARY
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <type-vocabulary>
+
+    <category name="frontend">
+      <type name="screen"
+            extension="tsx"
+            description="Full-screen stateful container. Backed by an Expo Router route. Reads TanStack Query + Zustand. Triggers mutations. Lives in a feature pod."
+            example="dashboard.screen.tsx, check-it.screen.tsx, item-label.screen.tsx" />
+      <type name="component"
+            extension="tsx"
+            description="Reusable presenter. Pure props — no Supabase, no Zustand, no side effects. Trivially testable."
+            example="item-card.component.tsx, kitchen-members.component.tsx, fun-fact-card.component.tsx" />
+      <type name="hook"
+            extension="ts"
+            description="Custom React hook. Encapsulates side effects, subscriptions, mutation calls. May read Zustand and TanStack Query."
+            example="kitchen.hook.ts, item.hook.ts, scan.hook.ts" />
+      <type name="store"
+            extension="ts"
+            description="Zustand store slice. Exported as a hook (useAuthStore). One slice per pod."
+            example="auth.store.ts, kitchen.store.ts, scan.store.ts, settings.store.ts" />
+      <type name="query"
+            extension="ts"
+            description="TanStack Query definitions for one domain: useQuery, useInfiniteQuery, useMutation wrappers. Handles optimistic updates (onMutate/onError/onSettled)."
+            example="item.query.ts, kitchen.query.ts, stash.query.ts, dashboard.query.ts" />
+      <type name="machine"
+            extension="ts"
+            description="XState v5 state machine. Scoped to item lifecycle only in v1."
+            example="item.machine.ts" />
+    </category>
+
+    <category name="shared">
+      <type name="schema"
+            extension="ts"
+            description="Zod v4 schema definitions and their inferred TypeScript types. DB rows, insert/update shapes, form validation, Edge Function I/O contracts."
+            example="item.schema.ts, kitchen.schema.ts, ai.schema.ts, edge-functions.schema.ts" />
+      <type name="type"
+            extension="ts"
+            description="TypeScript types and interfaces that do not need runtime validation. Structural types, union types, mapped types."
+            example="item.type.ts, scan.type.ts, kitchen.type.ts" />
+      <type name="util"
+            extension="ts"
+            description="Pure functions. No side effects. No React. No infrastructure. Importable from both client and Deno."
+            example="item.util.ts, scan.util.ts" />
+      <type name="constant"
+            extension="ts"
+            description="export const values only. Static lists, magic numbers, configuration. No functions."
+            example="tags.constant.ts, config.constant.ts, tokens.constant.ts" />
+    </category>
+
+    <category name="backend">
+      <type name="handler"
+            extension="ts"
+            description="Deno Edge Function entry point. Parses HTTP request, runs middleware pipeline, executes Effect program, returns HTTP response. Maximum 40 lines."
+            example="analyse-image.handler.ts, send-notifications.handler.ts" />
+      <type name="service"
+            extension="ts"
+            description="Business orchestration logic. Coordinates domain objects, ports, and external calls. Returns Effect. Used in both Edge Functions and domain layer."
+            example="analyse-image.service.ts, item-lifecycle.service.ts" />
+      <type name="adapter"
+            extension="ts"
+            description="Concrete hexagonal adapter. Implements a port interface using a real external technology. Lives in supabase/functions/_shared/adapters/."
+            example="supabase-item.adapter.ts, gemini-ai.adapter.ts, expo-push.adapter.ts" />
+      <type name="port"
+            extension="ts"
+            description="Hexagonal port. TypeScript interface only — zero implementation code. Lives in src/_shared/ports/."
+            example="item.port.ts, ai.port.ts, push.port.ts, command-queue.port.ts" />
+      <type name="error"
+            extension="ts"
+            description="Typed error classes for Effect's error channel. Each has a _tag discriminant for exhaustive matching."
+            example="domain.error.ts" />
+    </category>
+
+    <category name="domain">
+      <type name="value-object"
+            extension="ts"
+            description="Tactical DDD Value Object. Immutable. Defined by value not identity. Encapsulates business rules about a concept."
+            example="expiry-date.value-object.ts, quantity.value-object.ts, kitchen-role.value-object.ts" />
+      <type name="factory"
+            extension="ts"
+            description="Creates domain objects from multiple possible input shapes. Centralises mapping logic."
+            example="item.factory.ts — fromGeminiResponse(), fromBarcodeResponse(), fromManualEntry()" />
+      <type name="spec"
+            extension="ts"
+            description="Specification Pattern predicate. Composable business rule. NOT a test file."
+            example="expiry.spec.ts (IsExpired, IsExpiringSoon, IsFresh), notification.spec.ts (DueForNotification)" />
+    </category>
+
+    <category name="test">
+      <type name="test"
+            extension="ts or tsx"
+            description="Vitest test file. Always the final segment before the file extension. Use .tsx if the test renders JSX. Colocated with the source file."
+            example="kitchen.hook.test.ts, item-card.component.test.tsx, expiry-date.value-object.test.ts" />
+    </category>
+
+  </type-vocabulary>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       5. REPOSITORY STRUCTURE
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <structure>
+
+    <routing-layer path="app/">
+      <rule>Thin shells only. Every file is max 8 lines.</rule>
+      <rule>May only import from src/features/ and expo-router.</rule>
+      <rule>No hooks, no stores, no Supabase calls.</rule>
+      <routes>
+        <route file="app/(auth)/welcome.tsx"              renders="WelcomeScreen from features/auth" />
+        <route file="app/(auth)/sign-in.tsx"              renders="SignInScreen from features/auth" />
+        <route file="app/(app)/index.tsx"                 renders="DashboardScreen from features/dashboard" />
+        <route file="app/(app)/stash/index.tsx"           renders="StashScreen from features/stash" />
+        <route file="app/(app)/stash/[id].tsx"            renders="ItemLabelScreen from features/item" />
+        <route file="app/(app)/snap/index.tsx"            renders="ScanModeScreen from features/scan" />
+        <route file="app/(app)/snap/single.tsx"           renders="SnapItScreen from features/scan" />
+        <route file="app/(app)/snap/haul.tsx"             renders="HaulScreen from features/scan" />
+        <route file="app/(app)/snap/check-it.tsx"         renders="CheckItScreen from features/scan" />
+        <route file="app/(app)/snap/line-em-up.tsx"       renders="LineEmUpScreen from features/scan" />
+        <route file="app/(app)/bin/index.tsx"             renders="BinScreen from features/bin" />
+        <route file="app/(app)/rules/index.tsx"           renders="SettingsScreen from features/settings" />
+        <route file="app/(app)/rules/heads-up.tsx"        renders="HeadsUpScreen from features/settings" />
+        <route file="app/(app)/rules/kitchen.tsx"         renders="KitchenSettingsScreen from features/kitchen" />
+        <route file="app/(app)/rules/account.tsx"         renders="AccountScreen from features/auth" />
+        <route file="app/kitchen/invite/[token].tsx"      renders="InviteScreen from features/kitchen" />
+      </routes>
+    </routing-layer>
+
+    <feature-pods path="src/features/">
+      <pod name="auth"      path="src/features/auth/"      owns="Auth flows, session management, account deletion, OAuth upgrade" />
+      <pod name="kitchen"   path="src/features/kitchen/"   owns="Kitchen CRUD, members list, invite generation, role management" />
+      <pod name="item"      path="src/features/item/"      owns="Item domain, XState machine, The Label screen, ItemCard component, QuantityModal" />
+      <pod name="stash"     path="src/features/stash/"     owns="The Stash list view, filter chips, swipe actions" />
+      <pod name="scan"      path="src/features/scan/"      owns="Camera, Snap It, The Haul, Check It, Line Em Up, barcode scanning, upload pipeline" />
+      <pod name="dashboard" path="src/features/dashboard/" owns="The Fridge Door, fun fact card, urgency grid, category chart, finished strip" />
+      <pod name="bin"       path="src/features/bin/"       owns="The Bin waste log view" />
+      <pod name="settings"  path="src/features/settings/"  owns="House Rules screen, Heads Up (notification prefs), settingsStore" />
+      <rule>Each pod exposes a public API via index.ts. Import only from the pod's index.ts, never from internal pod files.</rule>
+      <rule>Every pod may have: screen(s), component(s), hook, store, query, schema, type, util, constant, machine (item only). Only create files that are needed.</rule>
+    </feature-pods>
+
+    <shared-layer path="src/_shared/">
+      <sublayer path="src/_shared/domain/"        contains="Pure business logic — Value Objects, Domain Services, Factories, Specifications. Zero runtime deps." />
+      <sublayer path="src/_shared/ports/"         contains="Hexagonal port interfaces (TypeScript interfaces only). No implementation code." />
+      <sublayer path="src/_shared/errors/"        contains="Typed error classes with _tag discriminants for Effect's error channel." />
+      <sublayer path="src/_shared/types/"         contains="Zod v4 schemas and inferred TypeScript types used across pods and Edge Functions." />
+      <rule>Nothing in src/_shared/ may import React, Supabase, Gemini SDK, Expo SDK, or any infrastructure library.</rule>
+      <rule>src/_shared/ is importable from both src/features/ (React Native) and supabase/functions/ (Deno).</rule>
+    </shared-layer>
+
+    <client-infra path="src/lib/">
+      <file path="src/lib/supabase.ts"        contains="Supabase JS client singleton, Realtime setup" />
+      <file path="src/lib/query-client.ts"    contains="TanStack Query client, AsyncStorage persister for offline reads" />
+      <file path="src/lib/notifications.ts"   contains="Expo push token registration and management" />
+      <rule>src/lib/ must not import from src/features/.</rule>
+    </client-infra>
+
+    <edge-functions path="supabase/functions/">
+      <shared path="supabase/functions/_shared/">
+        <sublayer path="supabase/functions/_shared/adapters/"   contains="Concrete adapter implementations for all ports" />
+        <sublayer path="supabase/functions/_shared/middleware/"  contains="Effect middleware: auth, validation, rate-limit" />
+        <sublayer path="supabase/functions/_shared/layers/"      contains="Effect Layer compositions per external service" />
+        <file path="supabase/functions/_shared/setup.ts"        contains="Common Edge Function bootstrap (CORS, error formatting)" />
+      </shared>
+      <functions>
+        <fn name="analyse-image"      dir="supabase/functions/analyse-image/"      trigger="Client HTTP POST" />
+        <fn name="process-image"      dir="supabase/functions/process-image/"      trigger="Supabase Storage webhook" />
+        <fn name="generate-fun-fact"  dir="supabase/functions/generate-fun-fact/"  trigger="Client HTTP GET or pg_cron" />
+        <fn name="send-notifications" dir="supabase/functions/send-notifications/" trigger="pg_cron 08:00 UTC via pg_net" />
+        <fn name="rag-query"          dir="supabase/functions/rag-query/"          trigger="Internal call only" />
+        <fn name="handle-invite"      dir="supabase/functions/handle-invite/"      trigger="Client HTTP GET (deep link)" />
+      </functions>
+      <rule>Every Edge Function directory contains: &lt;fn&gt;.handler.ts, &lt;fn&gt;.service.ts, &lt;fn&gt;.schema.ts, &lt;fn&gt;.handler.test.ts.</rule>
+      <rule>handler.ts is the entry point only. Orchestration logic belongs in service.ts.</rule>
+    </edge-functions>
+
+    <e2e-tests path="e2e/">
+      <rule>Maestro flow files are NOT colocated with feature pods. They live in e2e/flows/.</rule>
+      <rule>E2E file names: kebab-case descriptive name + .yaml. Example: snap-it-happy-path.yaml</rule>
+    </e2e-tests>
+
+  </structure>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       6. IMPORT RULES
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <imports>
+
+    <path-aliases>
+      <alias prefix="@/features/*"   resolves-to="src/features/*" />
+      <alias prefix="@/shared/*"     resolves-to="src/_shared/*" />
+      <alias prefix="@/lib/*"        resolves-to="src/lib/*" />
+      <alias prefix="@/constants/*"  resolves-to="src/constants/*" />
+    </path-aliases>
+
+    <dependency-direction>
+      app/ → src/features/ → src/_shared/ → (external packages only)
+      supabase/functions/&lt;fn&gt;/ → supabase/functions/_shared/ → src/_shared/ → (external Deno packages)
+    </dependency-direction>
+
+    <allowed>
+      <from layer="app/">                  <to>src/features/ (via barrel index.ts)</to></from>
+      <from layer="src/features/&lt;pod&gt;/">  <to>src/_shared/, src/lib/, src/constants/, other pods via their index.ts</to></from>
+      <from layer="src/_shared/domain/">   <to>src/_shared/types/, src/_shared/ports/, src/_shared/errors/</to></from>
+      <from layer="src/_shared/ports/">    <to>src/_shared/types/, src/_shared/errors/ (interfaces only)</to></from>
+      <from layer="src/lib/">              <to>src/_shared/, external packages</to></from>
+      <from layer="supabase/functions/&lt;fn&gt;/"> <to>supabase/functions/_shared/, src/_shared/</to></from>
+      <from layer="supabase/functions/_shared/adapters/"> <to>src/_shared/ports/, src/_shared/types/, src/_shared/errors/, external SDKs</to></from>
+    </allowed>
+
+    <forbidden>
+      <rule>src/_shared/domain/ must not import React, Supabase, Gemini, Expo, or any infrastructure library.</rule>
+      <rule>app/ must not import from src/_shared/, src/lib/, or supabase/.</rule>
+      <rule>supabase/functions/ must not import from src/features/.</rule>
+      <rule>src/lib/ must not import from src/features/.</rule>
+      <rule>Cross-pod imports must use the pod's index.ts barrel, never internal files.</rule>
+      <rule>src/_shared/ports/ must contain interfaces only — no implementation or class instantiation.</rule>
+    </forbidden>
+
+    <cross-pod-import-pattern>
+      <!-- When pod A needs a component from pod B: -->
+      <!-- CORRECT -->
+      import { ItemCard } from '@/features/item'
+      <!-- WRONG -->
+      import { ItemCard } from '@/features/item/item-card.component'
+    </cross-pod-import-pattern>
+
+  </imports>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       7. ZOD SCHEMAS
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <schemas>
+
+    <zod-version>v4</zod-version>
+
+    <api-reference>
+      <item>z.uuid() — for UUID strings (not z.string().uuid())</item>
+      <item>z.iso.datetime() — for TIMESTAMPTZ columns from Supabase (ISO 8601 with timezone)</item>
+      <item>z.iso.date() — for DATE columns (YYYY-MM-DD)</item>
+      <item>z.url() — for Supabase Storage signed URLs</item>
+      <item>z.enum([...]) — for PostgreSQL CHECK IN constraints</item>
+      <item>z.number().int() — for INT columns</item>
+      <item>z.number() — for NUMERIC columns</item>
+      <item>.nullable() — for nullable columns</item>
+      <item>.default(value) — on insert schemas to mirror DB defaults</item>
+      <item>z.discriminatedUnion('key', [...]) — for pass/fail response types</item>
+      <item>z.array(z.number()).length(768) — for vector(768) embedding columns</item>
+      <item>.catchall(z.unknown()) — for JSONB metadata columns</item>
+    </api-reference>
+
+    <naming-conventions>
+      <convention>Row schema (from DB):     {Entity}RowSchema → type {Entity}Row</convention>
+      <convention>Insert schema (to DB):    {Entity}InsertSchema → type {Entity}Insert</convention>
+      <convention>Update schema (partial):  {Entity}UpdateSchema → type {Entity}Update</convention>
+      <convention>Enum schemas:             {Name}Schema → type {Name}</convention>
+      <convention>Form schemas:             {Screen}FormSchema → type {Screen}Form</convention>
+      <convention>EF request:              {FunctionName}RequestSchema → type {FunctionName}Request</convention>
+      <convention>EF response:             {FunctionName}ResponseSchema → type {FunctionName}Response</convention>
+    </naming-conventions>
+
+    <security-omissions>
+      <!-- These fields must NEVER appear in Insert schemas sent from the client -->
+      <omit field="id"                  reason="Server-generated UUID" />
+      <omit field="created_at"          reason="Server-managed timestamp" />
+      <omit field="updated_at"          reason="Server-managed timestamp" />
+      <omit field="created_by"          reason="Security: derived from JWT server-side" />
+      <omit field="added_by"            reason="Security: derived from JWT server-side" />
+      <omit field="expires_at"          reason="Security: kitchen_invites.expires_at always set to NOW()+7days server-side" />
+      <omit field="image_url"           reason="Populated by process-image Edge Function post-upload" />
+      <omit field="image_thumbnail_url" reason="Populated by process-image Edge Function post-upload" />
+    </security-omissions>
+
+    <schema-files>
+      <file path="src/_shared/types/user.schema.ts"           contains="UserRow/Insert/Update, UserSettingsRow/Insert/Update, PushTokenRow/Insert/Update, ScanRateLimitRow" />
+      <file path="src/_shared/types/kitchen.schema.ts"        contains="KitchenRow/Insert/Update, KitchenMemberRow/Insert/Update, KitchenInviteRow/Insert/Update" />
+      <file path="src/_shared/types/item.schema.ts"           contains="ItemRow/Insert/Update, ItemEventRow/Insert, CheckItFormSchema, QuantityActionSchema" />
+      <file path="src/_shared/types/notifications.schema.ts"  contains="NotificationLogRow, DailyKitchenCacheRow/Insert, ExpoPushPayload" />
+      <file path="src/_shared/types/ai.schema.ts"             contains="GeminiAnalyseResponse (discriminated union), RagDocumentRow/Insert, RagMetadata" />
+      <file path="src/_shared/types/edge-functions.schema.ts" contains="Request/Response schemas for all 6 Edge Functions" />
+      <file path="src/_shared/types/index.ts"                 contains="Re-exports all public schemas and types" />
+    </schema-files>
+
+  </schemas>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       8. ZUSTAND STORES
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <zustand>
+    <stores>
+      <store name="authStore"     file="src/features/auth/auth.store.ts"         contains="session, userId, isAnonymous, authProvider" />
+      <store name="kitchenStore"  file="src/features/kitchen/kitchen.store.ts"   contains="activeKitchenId, role, members" />
+      <store name="uploadStore"   file="src/features/scan/scan.store.ts"         contains="uploadBatch, tempFilePaths, aiResults, flaggedItems" />
+      <store name="settingsStore" file="src/features/settings/settings.store.ts" contains="notificationDaysBefore, locale (persisted to disk)" />
+    </stores>
+    <rule>Stores are accessed via their exported hook (useAuthStore, useKitchenStore, etc.).</rule>
+    <rule>authStore is persisted to expo-secure-store (hardware-backed).</rule>
+    <rule>settingsStore is persisted to expo-file-system (non-sensitive).</rule>
+    <rule>uploadStore is in-memory only — never persisted.</rule>
+    <rule>Components (.component.tsx files) must not read Zustand stores. Read stores in screen files or hooks, pass as props.</rule>
+  </zustand>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       9. TANSTACK QUERY
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <tanstack-query>
+    <rule>Every useMutation must implement all three callbacks: onMutate (optimistic), onError (rollback + toast), onSettled (refetch).</rule>
+    <rule>The Stash and The Bin use useInfiniteQuery for cursor pagination. Never use a flat useQuery for paginated lists.</rule>
+    <rule>Configure gcTime: Infinity on Stash and Dashboard queries for offline reads (NFR-004).</rule>
+    <rule>TanStack Query client is initialised with AsyncStorage persister in src/lib/query-client.ts.</rule>
+    <rule>Invalidate queries on Supabase Realtime events inside useKitchenRealtime() hook.</rule>
+    <rule>Query keys follow the pattern: ['entity', 'operation', ...params]. Example: ['items', 'stash', kitchenId, filters].</rule>
+  </tanstack-query>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       10. EDGE FUNCTION CONVENTIONS
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <edge-functions>
+
+    <middleware-pipeline>
+      <!-- Every handler composes this pipeline via Effect.pipe -->
+      <step order="1" name="authenticate"   file="supabase/functions/_shared/middleware/auth.middleware.ts" />
+      <step order="2" name="validateInput"  file="supabase/functions/_shared/middleware/validation.middleware.ts" />
+      <step order="3" name="rateLimitCheck" file="supabase/functions/_shared/middleware/rate-limit.middleware.ts" />
+      <step order="4" name="executeService" description="Call the function's .service.ts" />
+    </middleware-pipeline>
+
+    <http-responses>
+      <response status="200" means="Success — body matches the function's ResponseSchema" />
+      <response status="400" means="Invalid input — validation failed" />
+      <response status="401" means="Missing or invalid JWT" />
+      <response status="403" means="PermissionError — authenticated but not authorised" />
+      <response status="404" means="NotFoundError — entity does not exist" />
+      <response status="429" means="RateLimitError — 20 scan/day limit exceeded" />
+      <response status="500" means="Unexpected defect — log and return generic message" />
+    </http-responses>
+
+    <rule>handler.ts maximum 40 lines. If it exceeds this, move logic to service.ts.</rule>
+    <rule>handler.ts must not contain business logic. It parses, pipelines, and responds.</rule>
+    <rule>service.ts must not construct HTTP responses. It returns Effect values.</rule>
+    <rule>All handler errors must be handled via Effect.match or Effect.catchAll before building the Response object.</rule>
+    <rule>The Gemini API key is read from Deno.env.get('GEMINI_API_KEY') inside the adapter only. Never in a handler or service.</rule>
+    <rule>The service role key is read from Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') inside the Supabase adapter only.</rule>
+
+  </edge-functions>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       11. TYPED ERROR TAXONOMY
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <errors>
+    <file>src/_shared/errors/domain.error.ts</file>
+    <error tag="NotFoundError"      fields="entityType: string, id: string" />
+    <error tag="PermissionError"    fields="role: KitchenRole, requiredRole: KitchenRole, action: string" />
+    <error tag="RateLimitError"     fields="limit: number, current: number, resetDate: string" />
+    <error tag="AIError"            fields="provider: string, message: string, retryable: boolean" />
+    <error tag="ModerationError"    fields="reason: ModerationReason" />
+    <error tag="StorageError"       fields="operation: string, path: string, message: string" />
+    <error tag="PushDeliveryError"  fields="token: string, statusCode: number" />
+    <error tag="InviteError"        fields="code: HandleInviteErrorCode" />
+    <rule>Every error class has a _tag: string field with a unique string literal value.</rule>
+    <rule>Use Effect.catchTag('NotFoundError', handler) — never catch by class instanceof.</rule>
+    <rule>Never use generic Error or unknown in an Effect's E type parameter.</rule>
+  </errors>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       12. ITEM TAXONOMY (TAG VOCABULARY)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <item-taxonomy>
+    <tags>Dairy, Produce, Meat, Seafood, Bakery, Pantry, Frozen, Condiments, Beverages, Snacks, Leftovers, Herbs &amp; Spices, Deli, Plant-Based</tags>
+    <rule>These are the ONLY valid item tags. Defined in ItemTagSchema in src/_shared/types/item.schema.ts.</rule>
+    <rule>src/constants/tags.ts derives the array from ItemTagSchema.options — it never defines its own list.</rule>
+    <rule>The Check It form's tag chip selector reads from ITEM_TAGS constant, which comes from ItemTagSchema.options.</rule>
+  </item-taxonomy>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       13. COLOCATION RULES
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <colocation>
+    <rule>Unit, component, and integration tests are colocated with the source file they test. Same directory.</rule>
+    <rule>Maestro E2E tests are NOT colocated. They live in e2e/flows/.</rule>
+    <rule>A pod contains only the files it needs. Do not create empty placeholder files.</rule>
+    <rule>A test file's name is always the source filename + .test: item.hook.ts → item.hook.test.ts</rule>
+    <rule>Component test files use .test.tsx if the test renders JSX; .test.ts otherwise.</rule>
+  </colocation>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       14. ANTI-PATTERNS (REJECT IN CODE REVIEW)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <anti-patterns>
+
+    <anti-pattern id="AP-01" severity="critical">
+      <name>Logic in app/ route files</name>
+      <description>app/ files must be thin shells. Any hook, state, or logic in an app/ file.</description>
+      <fix>Move to the corresponding src/features/&lt;pod&gt;/ screen component.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-02" severity="critical">
+      <name>Supabase client in a component file</name>
+      <description>Any import of supabase.ts or @supabase/supabase-js inside a *.component.tsx file.</description>
+      <fix>Move the data call to a hook. Pass result as a prop to the component.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-03" severity="critical">
+      <name>Infrastructure import in src/_shared/domain/</name>
+      <description>Any import of React, Supabase, Gemini SDK, Expo, or any package with side effects.</description>
+      <fix>Domain layer is pure TypeScript. Call ports (interfaces) instead.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-04" severity="critical">
+      <name>Direct internal pod import</name>
+      <description>import { X } from '@/features/item/item-card.component' from outside the item pod.</description>
+      <fix>import { X } from '@/features/item' (use the barrel).</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-05" severity="critical">
+      <name>try/catch on Effect</name>
+      <description>Using try/catch to handle errors from an Effect computation.</description>
+      <fix>Use Effect.catchTag, Effect.catchAll, or Effect.match.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-06" severity="high">
+      <name>Business rule in query.ts</name>
+      <description>Inline business logic (e.g. "if quantity &lt;= 0, set status to used") inside a useMutation function body.</description>
+      <fix>Call ItemLifecycleService.markUsed() from the mutation function. Keep logic in the domain service.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-07" severity="high">
+      <name>Business logic in handler.ts</name>
+      <description>Orchestration, domain rules, or external API calls directly in a .handler.ts file.</description>
+      <fix>Move to &lt;fn&gt;.service.ts. The handler only parses, pipelines, and responds.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-08" severity="high">
+      <name>Zustand read in a presenter component</name>
+      <description>Any useXxxStore() call inside a *.component.tsx file.</description>
+      <fix>Read the store in the parent screen or a hook. Pass the value as a prop.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-09" severity="high">
+      <name>Invented file type not in vocabulary</name>
+      <description>A file with a suffix not in the Type Vocabulary (e.g. *.controller.ts, *.repository.ts, *.context.ts).</description>
+      <fix>Use the closest vocabulary type. Update the PRD first if a new type is genuinely needed.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-10" severity="high">
+      <name>.spec.ts used as a Vitest test file</name>
+      <description>A Vitest test file named *.spec.ts or *.spec.tsx.</description>
+      <fix>Rename to *.test.ts / *.test.tsx. Reserve .spec for the Specification Pattern.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-11" severity="high">
+      <name>XState for non-item state</name>
+      <description>XState machine for auth flow, upload pipeline, or settings.</description>
+      <fix>Use the appropriate Zustand store (authStore, uploadStore, settingsStore).</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-12" severity="medium">
+      <name>index.ts used for implementation</name>
+      <description>A pod's index.ts contains component, hook, or service implementation code.</description>
+      <fix>index.ts is a barrel only. Move implementation to a named file.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-13" severity="medium">
+      <name>camelCase or PascalCase file names</name>
+      <description>Files named ItemCard.component.tsx or itemCard.component.tsx.</description>
+      <fix>item-card.component.tsx — all file names are kebab-case.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-14" severity="medium">
+      <name>Missing optimistic update in useMutation</name>
+      <description>A useMutation that does not implement onMutate, onError, and onSettled.</description>
+      <fix>All four mutations (mark used, mark wasted, add item, delete item) must implement all three callbacks.</fix>
+    </anti-pattern>
+
+    <anti-pattern id="AP-15" severity="medium">
+      <name>Secret in client code</name>
+      <description>GEMINI_API_KEY or SUPABASE_SERVICE_ROLE_KEY referenced outside of supabase/functions/.</description>
+      <fix>Secrets live in Supabase Vault. Read only inside adapters via Deno.env.get().</fix>
+    </anti-pattern>
+
+  </anti-patterns>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       15. NAMING EXAMPLES REFERENCE
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <examples>
+
+    <example type="screen">
+      <file>src/features/dashboard/dashboard.screen.tsx</file>
+      <file>src/features/scan/check-it.screen.tsx</file>
+      <file>src/features/item/item-label.screen.tsx</file>
+      <file>src/features/kitchen/kitchen-invite.screen.tsx</file>
+    </example>
+
+    <example type="component">
+      <file>src/features/item/item-card.component.tsx</file>
+      <file>src/features/item/item-badge.component.tsx</file>
+      <file>src/features/item/quantity-modal.component.tsx</file>
+      <file>src/features/kitchen/kitchen-members.component.tsx</file>
+      <file>src/features/dashboard/fun-fact-card.component.tsx</file>
+      <file>src/features/dashboard/urgency-grid.component.tsx</file>
+      <file>src/features/scan/barcode-overlay.component.tsx</file>
+      <file>src/features/scan/haul-strip.component.tsx</file>
+    </example>
+
+    <example type="hook">
+      <file>src/features/auth/auth.hook.ts</file>
+      <file>src/features/kitchen/kitchen.hook.ts</file>
+      <file>src/features/item/item.hook.ts</file>
+      <file>src/features/scan/scan.hook.ts</file>
+    </example>
+
+    <example type="store">
+      <file>src/features/auth/auth.store.ts</file>
+      <file>src/features/kitchen/kitchen.store.ts</file>
+      <file>src/features/scan/scan.store.ts</file>
+      <file>src/features/settings/settings.store.ts</file>
+    </example>
+
+    <example type="query">
+      <file>src/features/item/item.query.ts</file>
+      <file>src/features/stash/stash.query.ts</file>
+      <file>src/features/kitchen/kitchen.query.ts</file>
+      <file>src/features/dashboard/dashboard.query.ts</file>
+      <file>src/features/bin/bin.query.ts</file>
+    </example>
+
+    <example type="machine">
+      <file>src/features/item/item.machine.ts</file>
+    </example>
+
+    <example type="schema">
+      <file>src/_shared/types/item.schema.ts</file>
+      <file>src/_shared/types/kitchen.schema.ts</file>
+      <file>src/_shared/types/ai.schema.ts</file>
+      <file>src/_shared/types/edge-functions.schema.ts</file>
+      <file>src/features/scan/scan.schema.ts</file>
+      <file>src/features/stash/stash.schema.ts</file>
+    </example>
+
+    <example type="value-object">
+      <file>src/_shared/domain/value-objects/expiry-date.value-object.ts</file>
+      <file>src/_shared/domain/value-objects/quantity.value-object.ts</file>
+      <file>src/_shared/domain/value-objects/kitchen-role.value-object.ts</file>
+      <file>src/_shared/domain/value-objects/invite-token.value-object.ts</file>
+      <file>src/_shared/domain/value-objects/item-tags.value-object.ts</file>
+    </example>
+
+    <example type="service">
+      <file>src/_shared/domain/services/item-lifecycle.service.ts</file>
+      <file>src/_shared/domain/services/kitchen-permission.service.ts</file>
+      <file>src/_shared/domain/services/scan-quota.service.ts</file>
+      <file>supabase/functions/analyse-image/analyse-image.service.ts</file>
+      <file>supabase/functions/send-notifications/send-notifications.service.ts</file>
+    </example>
+
+    <example type="handler">
+      <file>supabase/functions/analyse-image/analyse-image.handler.ts</file>
+      <file>supabase/functions/handle-invite/handle-invite.handler.ts</file>
+      <file>supabase/functions/generate-fun-fact/generate-fun-fact.handler.ts</file>
+    </example>
+
+    <example type="adapter">
+      <file>supabase/functions/_shared/adapters/supabase-item.adapter.ts</file>
+      <file>supabase/functions/_shared/adapters/gemini-ai.adapter.ts</file>
+      <file>supabase/functions/_shared/adapters/expo-push.adapter.ts</file>
+      <file>supabase/functions/_shared/adapters/supabase-storage.adapter.ts</file>
+      <file>supabase/functions/_shared/adapters/supabase-rag.adapter.ts</file>
+    </example>
+
+    <example type="port">
+      <file>src/_shared/ports/item.port.ts</file>
+      <file>src/_shared/ports/ai.port.ts</file>
+      <file>src/_shared/ports/push.port.ts</file>
+      <file>src/_shared/ports/storage.port.ts</file>
+      <file>src/_shared/ports/rag.port.ts</file>
+      <file>src/_shared/ports/command-queue.port.ts</file>
+    </example>
+
+    <example type="factory">
+      <file>src/_shared/domain/factories/item.factory.ts</file>
+    </example>
+
+    <example type="spec">
+      <file>src/_shared/domain/specs/expiry.spec.ts</file>
+      <file>src/_shared/domain/specs/notification.spec.ts</file>
+    </example>
+
+    <example type="test">
+      <file>src/_shared/domain/value-objects/expiry-date.value-object.test.ts</file>
+      <file>src/_shared/domain/services/item-lifecycle.service.test.ts</file>
+      <file>src/features/item/item-card.component.test.tsx</file>
+      <file>src/features/kitchen/kitchen.hook.test.ts</file>
+      <file>src/features/item/item.machine.test.ts</file>
+      <file>supabase/functions/analyse-image/analyse-image.handler.test.ts</file>
+    </example>
+
+  </examples>
+
+</guidelines>
