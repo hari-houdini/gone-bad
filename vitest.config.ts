@@ -28,7 +28,7 @@ export default defineConfig({
      * explicit imports — consistent with Jest muscle-memory.
      */
     globals: true,
-    setupFiles: ['./src/test-utils/setup.ts'],
+    setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
@@ -36,7 +36,7 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/**/*.test.{ts,tsx}',
-        'src/test-utils/**',
+        'src/test/**',
         // Barrel re-exports and pure type files carry no logic to cover.
         'src/**/index.ts',
         'src/**/*.type.ts',
