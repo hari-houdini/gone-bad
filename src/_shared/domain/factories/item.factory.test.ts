@@ -3,6 +3,7 @@ import { ItemInsertSchema } from '@/shared/types'
 import type { CheckItForm, GeminiAnalyseSuccess } from '@/shared/types'
 
 const KITCHEN_ID = 'a1b2c3d4-e5f6-4789-abcd-ef0123456789'
+const factory = new ItemFactory()
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -24,7 +25,7 @@ function makeForm(overrides: Partial<CheckItForm> = {}): CheckItForm {
 
 describe('ItemFactory.fromManualEntry — required fields', () => {
   const form = makeForm()
-  const insert = ItemFactory.fromManualEntry(form, KITCHEN_ID)
+  const insert = factory.fromManualEntry(form, KITCHEN_ID)
 
   it('sets kitchen_id', () => {
     expect(insert.kitchen_id).toBe(KITCHEN_ID)
@@ -52,7 +53,7 @@ describe('ItemFactory.fromManualEntry — required fields', () => {
 // ---------------------------------------------------------------------------
 
 describe('ItemFactory.fromManualEntry — optional fields', () => {
-  const insert = ItemFactory.fromManualEntry(makeForm(), KITCHEN_ID)
+  const insert = factory.fromManualEntry(makeForm(), KITCHEN_ID)
 
   it('defaults description to null', () => {
     expect(insert.description).toBeNull()
@@ -88,7 +89,7 @@ describe('ItemFactory.fromManualEntry — optional fields', () => {
 // ---------------------------------------------------------------------------
 
 describe('ItemFactory.fromManualEntry — scan pipeline fields', () => {
-  const insert = ItemFactory.fromManualEntry(makeForm(), KITCHEN_ID)
+  const insert = factory.fromManualEntry(makeForm(), KITCHEN_ID)
 
   it('sets image_path to null', () => {
     expect(insert.image_path).toBeNull()
@@ -117,7 +118,7 @@ describe('ItemFactory.fromManualEntry — populated optional fields', () => {
     storage_suggestion: 'Keep refrigerated below 5°C',
     notification_days_before: 5,
   })
-  const insert = ItemFactory.fromManualEntry(form, KITCHEN_ID)
+  const insert = factory.fromManualEntry(form, KITCHEN_ID)
 
   it('passes description through', () => {
     expect(insert.description).toBe('Full-fat plain yogurt')
@@ -146,7 +147,7 @@ describe('ItemFactory.fromManualEntry — schema validation', () => {
       expiry_date: '2025-12-31',
       quantity_unit: 'g',
     })
-    const insert = ItemFactory.fromManualEntry(form, KITCHEN_ID)
+    const insert = factory.fromManualEntry(form, KITCHEN_ID)
     expect(() => ItemInsertSchema.parse(insert)).not.toThrow()
   })
 })
@@ -158,11 +159,11 @@ describe('ItemFactory.fromManualEntry — schema validation', () => {
 describe('ItemFactory stubs', () => {
   it('fromGeminiResponse throws with a Phase 4 message', () => {
     expect(() =>
-      ItemFactory.fromGeminiResponse({} as GeminiAnalyseSuccess, KITCHEN_ID),
+      factory.fromGeminiResponse({} as GeminiAnalyseSuccess, KITCHEN_ID),
     ).toThrow(/Phase 4/)
   })
 
   it('fromBarcodeResponse throws with a Phase 4 message', () => {
-    expect(() => ItemFactory.fromBarcodeResponse({}, KITCHEN_ID)).toThrow(/Phase 4/)
+    expect(() => factory.fromBarcodeResponse({}, KITCHEN_ID)).toThrow(/Phase 4/)
   })
 })

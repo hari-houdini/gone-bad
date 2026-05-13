@@ -2,6 +2,8 @@ import { KitchenPermissionService } from './kitchen-permission.service'
 import { PermissionError } from '@/shared/errors'
 import type { KitchenAction } from './kitchen-permission.service'
 
+const svc = new KitchenPermissionService()
+
 // ---------------------------------------------------------------------------
 // canPerformAction
 // ---------------------------------------------------------------------------
@@ -13,12 +15,12 @@ describe('KitchenPermissionService.canPerformAction', () => {
   describe('owner', () => {
     writeActions.forEach((action) => {
       it(`can ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('owner', action)).toBe(true)
+        expect(svc.canPerformAction('owner', action)).toBe(true)
       })
     })
     adminActions.forEach((action) => {
       it(`can ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('owner', action)).toBe(true)
+        expect(svc.canPerformAction('owner', action)).toBe(true)
       })
     })
   })
@@ -26,12 +28,12 @@ describe('KitchenPermissionService.canPerformAction', () => {
   describe('editor', () => {
     writeActions.forEach((action) => {
       it(`can ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('editor', action)).toBe(true)
+        expect(svc.canPerformAction('editor', action)).toBe(true)
       })
     })
     adminActions.forEach((action) => {
       it(`cannot ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('editor', action)).toBe(false)
+        expect(svc.canPerformAction('editor', action)).toBe(false)
       })
     })
   })
@@ -39,12 +41,12 @@ describe('KitchenPermissionService.canPerformAction', () => {
   describe('viewer', () => {
     writeActions.forEach((action) => {
       it(`cannot ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('viewer', action)).toBe(false)
+        expect(svc.canPerformAction('viewer', action)).toBe(false)
       })
     })
     adminActions.forEach((action) => {
       it(`cannot ${action}`, () => {
-        expect(KitchenPermissionService.canPerformAction('viewer', action)).toBe(false)
+        expect(svc.canPerformAction('viewer', action)).toBe(false)
       })
     })
   })
@@ -56,15 +58,15 @@ describe('KitchenPermissionService.canPerformAction', () => {
 
 describe('KitchenPermissionService.assertCan — allowed', () => {
   it('does not throw when owner performs a write action', () => {
-    expect(() => KitchenPermissionService.assertCan('owner', 'add_item')).not.toThrow()
+    expect(() => svc.assertCan('owner', 'add_item')).not.toThrow()
   })
 
   it('does not throw when owner performs an admin action', () => {
-    expect(() => KitchenPermissionService.assertCan('owner', 'delete_kitchen')).not.toThrow()
+    expect(() => svc.assertCan('owner', 'delete_kitchen')).not.toThrow()
   })
 
   it('does not throw when editor performs a write action', () => {
-    expect(() => KitchenPermissionService.assertCan('editor', 'edit_item')).not.toThrow()
+    expect(() => svc.assertCan('editor', 'edit_item')).not.toThrow()
   })
 })
 
@@ -74,18 +76,18 @@ describe('KitchenPermissionService.assertCan — allowed', () => {
 
 describe('KitchenPermissionService.assertCan — denied', () => {
   it('throws PermissionError when viewer tries to add an item', () => {
-    expect(() => KitchenPermissionService.assertCan('viewer', 'add_item')).toThrow(PermissionError)
+    expect(() => svc.assertCan('viewer', 'add_item')).toThrow(PermissionError)
   })
 
   it('throws PermissionError when editor tries to remove a member', () => {
     expect(() =>
-      KitchenPermissionService.assertCan('editor', 'remove_member'),
+      svc.assertCan('editor', 'remove_member'),
     ).toThrow(PermissionError)
   })
 
   it('carries the action on the thrown error', () => {
     try {
-      KitchenPermissionService.assertCan('viewer', 'delete_kitchen')
+      svc.assertCan('viewer', 'delete_kitchen')
     } catch (e) {
       expect(e).toBeInstanceOf(PermissionError)
       const err = e as PermissionError
@@ -96,7 +98,7 @@ describe('KitchenPermissionService.assertCan — denied', () => {
 
   it('has the correct _tag on the thrown error', () => {
     try {
-      KitchenPermissionService.assertCan('viewer', 'rename_kitchen')
+      svc.assertCan('viewer', 'rename_kitchen')
     } catch (e) {
       expect((e as PermissionError)._tag).toBe('PermissionError')
     }

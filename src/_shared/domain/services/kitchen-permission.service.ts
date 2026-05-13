@@ -10,28 +10,12 @@
 import type { KitchenRole as KitchenRoleType } from '@/shared/types'
 import { PermissionError } from '@/shared/errors'
 import { KitchenRole } from '../value-objects/kitchen-role.value-object'
+import type {
+  IKitchenPermissionService,
+  KitchenAction,
+} from './kitchen-permission.service.interface'
 
-// ---------------------------------------------------------------------------
-// KitchenAction
-// ---------------------------------------------------------------------------
-
-/**
- * All operations that require a permission check before execution.
- *
- * @remarks
- * - Write actions (`add_item`, `edit_item`, `delete_item`, `generate_invite`)
- *   require at least `'editor'`.
- * - Administrative actions (`remove_member`, `rename_kitchen`, `delete_kitchen`)
- *   require `'owner'`.
- */
-export type KitchenAction =
-  | 'add_item'
-  | 'edit_item'
-  | 'delete_item'
-  | 'generate_invite'
-  | 'remove_member'
-  | 'rename_kitchen'
-  | 'delete_kitchen'
+export type { KitchenAction } from './kitchen-permission.service.interface'
 
 // ---------------------------------------------------------------------------
 // Permission table
@@ -61,15 +45,17 @@ const ACTION_REQUIREMENTS: Record<KitchenAction, KitchenRoleType> = {
  *
  * @example
  * ```ts
+ * const svc = new KitchenPermissionService()
+ *
  * // Guard a button
- * const canDelete = KitchenPermissionService.canPerformAction(role, 'delete_item')
+ * const canDelete = svc.canPerformAction(role, 'delete_item')
  *
  * // Guard a mutation
- * KitchenPermissionService.assertCan(role, 'rename_kitchen')
+ * svc.assertCan(role, 'rename_kitchen')
  * await supabase.from('kitchens').update({ name }).eq('id', kitchenId)
  * ```
  */
-export class KitchenPermissionService {
+export class KitchenPermissionService implements IKitchenPermissionService {
   /**
    * Returns `true` when `role` meets the minimum requirement for `action`.
    *
@@ -77,7 +63,7 @@ export class KitchenPermissionService {
    * @param action - The {@link KitchenAction} to test.
    * @returns `true` if the role satisfies the minimum; `false` otherwise.
    */
-  static canPerformAction(role: KitchenRoleType, action: KitchenAction): boolean {
+  canPerformAction(role: KitchenRoleType, action: KitchenAction): boolean {
     return KitchenRole.from(role).satisfies(ACTION_REQUIREMENTS[action])
   }
 
@@ -89,8 +75,8 @@ export class KitchenPermissionService {
    * @throws {PermissionError} When the role does not satisfy the minimum
    *   requirement, carrying the `action` and required role as structured fields.
    */
-  static assertCan(role: KitchenRoleType, action: KitchenAction): void {
-    if (!KitchenPermissionService.canPerformAction(role, action)) {
+  assertCan(role: KitchenRoleType, action: KitchenAction): void {
+    if (!this.canPerformAction(role, action)) {
       throw new PermissionError(action, ACTION_REQUIREMENTS[action])
     }
   }

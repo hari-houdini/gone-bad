@@ -6,6 +6,8 @@
  * errors. Time-of-day is intentionally discarded; expiry is a calendar concept.
  */
 
+import type { IExpiryDate } from './expiry-date.value-object.interface'
+
 // ---------------------------------------------------------------------------
 // ExpiryDate
 // ---------------------------------------------------------------------------
@@ -20,7 +22,7 @@
  * Use-by semantics: an item expiring today (`daysUntilExpiry() === 0`) is
  * **not** considered expired — it is still safe to use on that calendar day.
  */
-export class ExpiryDate {
+export class ExpiryDate implements IExpiryDate {
   private constructor(private readonly _value: string) {}
 
   // ---------------------------------------------------------------------------

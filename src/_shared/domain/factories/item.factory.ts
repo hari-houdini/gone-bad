@@ -13,6 +13,7 @@
  */
 
 import type { CheckItForm, ItemInsert, GeminiAnalyseSuccess } from '@/shared/types'
+import type { IItemFactory } from './item.factory.interface'
 
 // ---------------------------------------------------------------------------
 // ItemFactory
@@ -29,7 +30,7 @@ import type { CheckItForm, ItemInsert, GeminiAnalyseSuccess } from '@/shared/typ
  * set here — they are either omitted (relying on DB defaults) or populated by
  * Edge Functions.
  */
-export class ItemFactory {
+export class ItemFactory implements IItemFactory {
   // ---------------------------------------------------------------------------
   // fromManualEntry
   // ---------------------------------------------------------------------------
@@ -48,7 +49,7 @@ export class ItemFactory {
    * @param kitchenId - UUID of the kitchen the item belongs to.
    * @returns A complete {@link ItemInsert} ready to persist.
    */
-  static fromManualEntry(form: CheckItForm, kitchenId: string): ItemInsert {
+  fromManualEntry(form: CheckItForm, kitchenId: string): ItemInsert {
     return {
       kitchen_id: kitchenId,
       name: form.name,
@@ -87,7 +88,7 @@ export class ItemFactory {
    * @param _kitchenId - UUID of the destination kitchen.
    * @throws {Error} Always — implementation pending Phase 4.
    */
-  static fromGeminiResponse(_response: GeminiAnalyseSuccess, _kitchenId: string): ItemInsert {
+  fromGeminiResponse(_response: GeminiAnalyseSuccess, _kitchenId: string): ItemInsert {
     throw new Error(
       'ItemFactory.fromGeminiResponse is not implemented until Phase 4 (analyse-image pipeline)',
     )
@@ -111,7 +112,7 @@ export class ItemFactory {
    * @throws {Error} Always — implementation pending Phase 4.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static fromBarcodeResponse(_product: unknown, _kitchenId: string): ItemInsert {
+  fromBarcodeResponse(_product: unknown, _kitchenId: string): ItemInsert {
     throw new Error(
       'ItemFactory.fromBarcodeResponse is not implemented until Phase 4 (barcode scan pipeline)',
     )

@@ -16,6 +16,7 @@
 
 import type { ItemRow } from '@/shared/types'
 import { ExpiryDate } from '../value-objects/expiry-date.value-object'
+import type { IIsExpiredSpec, IIsExpiringSoonSpec, IIsFreshSpec } from './expiry.spec.interface'
 
 // ---------------------------------------------------------------------------
 // IsExpiredSpec
@@ -34,7 +35,7 @@ import { ExpiryDate } from '../value-objects/expiry-date.value-object'
  * const expired = items.filter(i => spec.isSatisfiedBy(i))
  * ```
  */
-export class IsExpiredSpec {
+export class IsExpiredSpec implements IIsExpiredSpec {
   /**
    * @param referenceDate - Date to evaluate against; defaults to `new Date()`.
    */
@@ -72,7 +73,7 @@ export class IsExpiredSpec {
  * const urgent = items.filter(i => spec.isSatisfiedBy(i))
  * ```
  */
-export class IsExpiringSoonSpec {
+export class IsExpiringSoonSpec implements IIsExpiringSoonSpec {
   /**
    * @param daysBefore - Alert threshold in calendar days (inclusive). Defaults to `3`.
    * @param referenceDate - Date to evaluate against; defaults to `new Date()`.
@@ -118,7 +119,7 @@ export class IsExpiringSoonSpec {
  * const safe = items.filter(i => spec.isSatisfiedBy(i))
  * ```
  */
-export class IsFreshSpec {
+export class IsFreshSpec implements IIsFreshSpec {
   /**
    * @param daysBefore - Must match the threshold used by {@link IsExpiringSoonSpec}
    *   so the two specs together form a clean partition. Defaults to `3`.

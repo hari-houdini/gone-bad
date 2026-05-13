@@ -6,6 +6,8 @@
  * is always `≥ 0`; subtraction clamps at zero rather than throwing.
  */
 
+import type { IQuantity } from './quantity.value-object.interface'
+
 // ---------------------------------------------------------------------------
 // Quantity
 // ---------------------------------------------------------------------------
@@ -18,7 +20,7 @@
  * metadata only — unit compatibility is the caller's responsibility and is not
  * enforced here.
  */
-export class Quantity {
+export class Quantity implements IQuantity {
   /** Numeric amount; always `≥ 0`. */
   readonly value: number
   /** Optional free-text unit label, e.g. `'g'`, `'ml'`, `'slices'`. */

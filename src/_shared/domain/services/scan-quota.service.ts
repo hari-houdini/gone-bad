@@ -10,6 +10,8 @@
  * and the React Native client (pre-flight UX warning).
  */
 
+import type { IScanQuotaService } from './scan-quota.service.interface'
+
 // ---------------------------------------------------------------------------
 // Constant
 // ---------------------------------------------------------------------------
@@ -26,19 +28,20 @@ export const DAILY_SCAN_LIMIT = 20
  *
  * @example
  * ```ts
- * if (ScanQuotaService.isQuotaExceeded(todayCount)) {
+ * const svc = new ScanQuotaService()
+ * if (svc.isQuotaExceeded(todayCount)) {
  *   throw new RateLimitError(DAILY_SCAN_LIMIT, resetAt)
  * }
  * ```
  */
-export class ScanQuotaService {
+export class ScanQuotaService implements IScanQuotaService {
   /**
    * Returns `true` when the user has consumed their daily scan allowance.
    *
    * @param scanCount - Number of AI scans performed today for this user.
    * @returns `true` if `scanCount ≥ DAILY_SCAN_LIMIT`.
    */
-  static isQuotaExceeded(scanCount: number): boolean {
+  isQuotaExceeded(scanCount: number): boolean {
     return scanCount >= DAILY_SCAN_LIMIT
   }
 
@@ -48,7 +51,7 @@ export class ScanQuotaService {
    * @param scanCount - Number of AI scans performed today for this user.
    * @returns `max(0, DAILY_SCAN_LIMIT - scanCount)`.
    */
-  static remainingScans(scanCount: number): number {
+  remainingScans(scanCount: number): number {
     return Math.max(0, DAILY_SCAN_LIMIT - scanCount)
   }
 }

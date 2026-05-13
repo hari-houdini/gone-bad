@@ -12,6 +12,7 @@
 
 import type { ItemRow } from '@/shared/types'
 import { ExpiryDate } from '../value-objects/expiry-date.value-object'
+import type { IDueForNotificationSpec } from './notification.spec.interface'
 
 // ---------------------------------------------------------------------------
 // DueForNotificationSpec
@@ -37,7 +38,7 @@ import { ExpiryDate } from '../value-objects/expiry-date.value-object'
  * const dueItems = allItems.filter(i => spec.isSatisfiedBy(i))
  * ```
  */
-export class DueForNotificationSpec {
+export class DueForNotificationSpec implements IDueForNotificationSpec {
   /**
    * @param defaultDaysBefore - Fallback alert threshold when an item has no
    *   per-item override. Defaults to `3`.

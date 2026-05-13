@@ -9,6 +9,7 @@
 
 import type { ItemRow } from '@/shared/types'
 import { DueForNotificationSpec } from '../specs/notification.spec'
+import type { INotificationScheduleService } from './notification-schedule.service.interface'
 
 // ---------------------------------------------------------------------------
 // NotificationScheduleService
@@ -26,13 +27,14 @@ import { DueForNotificationSpec } from '../specs/notification.spec'
  *
  * @example
  * ```ts
- * const dueItems = NotificationScheduleService.getItemsDueForNotification(
+ * const svc = new NotificationScheduleService()
+ * const dueItems = svc.getItemsDueForNotification(
  *   allKitchenItems,
  *   userSettings.notification_days_before ?? 3,
  * )
  * ```
  */
-export class NotificationScheduleService {
+export class NotificationScheduleService implements INotificationScheduleService {
   /**
    * Returns the subset of `items` that should receive a push notification today.
    *
@@ -43,7 +45,7 @@ export class NotificationScheduleService {
    * @param referenceDate - Date to evaluate against; defaults to `new Date()`.
    * @returns Items satisfying {@link DueForNotificationSpec}.
    */
-  static getItemsDueForNotification(
+  getItemsDueForNotification(
     items: ItemRow[],
     defaultDaysBefore = 3,
     referenceDate?: Date,

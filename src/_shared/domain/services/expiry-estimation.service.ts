@@ -9,6 +9,8 @@
  * calculations, matching the convention established in {@link ExpiryDate}.
  */
 
+import type { IExpiryEstimationService } from './expiry-estimation.service.interface'
+
 // ---------------------------------------------------------------------------
 // ExpiryEstimationService
 // ---------------------------------------------------------------------------
@@ -19,11 +21,12 @@
  * @example
  * ```ts
  * // Gemini says "use within 5 days"
- * const expiry = ExpiryEstimationService.estimateExpiryDate(5)
+ * const svc = new ExpiryEstimationService()
+ * const expiry = svc.estimateExpiryDate(5)
  * // → '2025-06-20' (if today is 2025-06-15)
  * ```
  */
-export class ExpiryEstimationService {
+export class ExpiryEstimationService implements IExpiryEstimationService {
   /**
    * Returns a `YYYY-MM-DD` ISO date string that is `estimatedDays` calendar days
    * after `referenceDate` (defaults to today).
@@ -34,7 +37,7 @@ export class ExpiryEstimationService {
    * @throws {Error} When `estimatedDays` is not a positive integer — indicates
    *   a Gemini prompt regression.
    */
-  static estimateExpiryDate(estimatedDays: number, referenceDate?: Date): string {
+  estimateExpiryDate(estimatedDays: number, referenceDate?: Date): string {
     if (!Number.isInteger(estimatedDays) || estimatedDays <= 0) {
       throw new Error(
         `ExpiryEstimationService: estimatedDays must be a positive integer, got ${estimatedDays}`,

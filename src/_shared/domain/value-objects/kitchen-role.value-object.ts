@@ -7,6 +7,7 @@
  */
 
 import type { KitchenRole as KitchenRoleType } from '@/shared/types'
+import type { IKitchenRole } from './kitchen-role.value-object.interface'
 
 // ---------------------------------------------------------------------------
 // Role rank table
@@ -36,7 +37,7 @@ const ROLE_RANK: Record<KitchenRoleType, number> = {
  * if (!role.canWrite) throw new PermissionError('add_item', 'editor')
  * ```
  */
-export class KitchenRole {
+export class KitchenRole implements IKitchenRole {
   private constructor(private readonly _role: KitchenRoleType) {}
 
   // ---------------------------------------------------------------------------

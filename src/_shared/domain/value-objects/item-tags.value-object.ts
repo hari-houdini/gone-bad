@@ -7,6 +7,7 @@
  */
 
 import type { ItemTag } from '@/shared/types'
+import type { IItemTags } from './item-tags.value-object.interface'
 
 // ---------------------------------------------------------------------------
 // ItemTags
@@ -22,7 +23,7 @@ import type { ItemTag } from '@/shared/types'
  * Mutation methods (`add`, `remove`) return new instances — the original is
  * never modified.
  */
-export class ItemTags {
+export class ItemTags implements IItemTags {
   private readonly _tags: ReadonlyArray<ItemTag>
 
   private constructor(tags: ItemTag[]) {

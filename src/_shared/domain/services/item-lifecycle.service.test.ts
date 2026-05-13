@@ -2,6 +2,7 @@ import type { ItemRow, QuantityAction } from '@/shared/types'
 import { ItemLifecycleService } from './item-lifecycle.service'
 
 const NOW = new Date('2025-06-15T10:00:00Z')
+const svc = new ItemLifecycleService()
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -53,7 +54,7 @@ function partialOf(eventType: 'used' | 'wasted', qty: number, unit?: string): Qu
 
 describe('ItemLifecycleService.markUsed — all', () => {
   const item = makeItem()
-  const result = ItemLifecycleService.markUsed(item, allOf('used'), NOW)
+  const result = svc.markUsed(item, allOf('used'), NOW)
 
   it('sets status to used', () => {
     expect(result.itemUpdate.status).toBe('used')
@@ -86,7 +87,7 @@ describe('ItemLifecycleService.markUsed — all', () => {
 
 describe('ItemLifecycleService.markUsed — partial, item stays active', () => {
   const item = makeItem()
-  const result = ItemLifecycleService.markUsed(item, partialOf('used', 1), NOW)
+  const result = svc.markUsed(item, partialOf('used', 1), NOW)
 
   it('does not change status', () => {
     expect(result.itemUpdate.status).toBeUndefined()
@@ -112,7 +113,7 @@ describe('ItemLifecycleService.markUsed — partial, item stays active', () => {
 
 describe('ItemLifecycleService.markUsed — partial that fully consumes', () => {
   const item = makeItem({ quantity_remaining: 2 })
-  const result = ItemLifecycleService.markUsed(item, partialOf('used', 2), NOW)
+  const result = svc.markUsed(item, partialOf('used', 2), NOW)
 
   it('transitions to used status', () => {
     expect(result.itemUpdate.status).toBe('used')
@@ -133,7 +134,7 @@ describe('ItemLifecycleService.markUsed — partial that fully consumes', () => 
 
 describe('ItemLifecycleService.markUsed — with tracked quantity_remaining', () => {
   const item = makeItem({ quantity: 4, quantity_remaining: 2 })
-  const result = ItemLifecycleService.markUsed(item, allOf('used'), NOW)
+  const result = svc.markUsed(item, allOf('used'), NOW)
 
   it('consumes only the remaining quantity, not the original quantity', () => {
     expect(result.eventInsert.quantity).toBe(2)
@@ -150,7 +151,7 @@ describe('ItemLifecycleService.markUsed — with tracked quantity_remaining', ()
 
 describe('ItemLifecycleService.markWasted — all', () => {
   const item = makeItem()
-  const result = ItemLifecycleService.markWasted(item, allOf('wasted'), NOW)
+  const result = svc.markWasted(item, allOf('wasted'), NOW)
 
   it('sets status to wasted', () => {
     expect(result.itemUpdate.status).toBe('wasted')
@@ -176,7 +177,7 @@ describe('ItemLifecycleService.markWasted — all', () => {
 
 describe('ItemLifecycleService.markWasted — partial', () => {
   const item = makeItem()
-  const result = ItemLifecycleService.markWasted(item, partialOf('wasted', 1, 'pint'), NOW)
+  const result = svc.markWasted(item, partialOf('wasted', 1, 'pint'), NOW)
 
   it('does not change status', () => {
     expect(result.itemUpdate.status).toBeUndefined()
@@ -203,12 +204,12 @@ describe('ItemLifecycleService — note field', () => {
       quantity_mode: 'all',
       note: 'Used in pasta sauce',
     }
-    const result = ItemLifecycleService.markUsed(item, action, NOW)
+    const result = svc.markUsed(item, action, NOW)
     expect(result.eventInsert.note).toBe('Used in pasta sauce')
   })
 
   it('sets note to null when omitted', () => {
-    const result = ItemLifecycleService.markUsed(makeItem(), allOf('used'), NOW)
+    const result = svc.markUsed(makeItem(), allOf('used'), NOW)
     expect(result.eventInsert.note).toBeNull()
   })
 })

@@ -13,24 +13,12 @@
 
 import type { ItemRow, ItemUpdate, ItemEventInsert, QuantityAction } from '@/shared/types'
 import { Quantity } from '../value-objects/quantity.value-object'
+import type {
+  IItemLifecycleService,
+  LifecycleResult,
+} from './item-lifecycle.service.interface'
 
-// ---------------------------------------------------------------------------
-// LifecycleResult
-// ---------------------------------------------------------------------------
-
-/**
- * Return value of every {@link ItemLifecycleService} method.
- *
- * @remarks
- * Both records must be persisted atomically — apply `itemUpdate` and insert
- * `eventInsert` in the same Supabase RPC call to avoid partial state.
- */
-export interface LifecycleResult {
-  /** Fields to patch on the `items` row. */
-  itemUpdate: ItemUpdate
-  /** New row to append to the `item_events` audit log. */
-  eventInsert: ItemEventInsert
-}
+export type { LifecycleResult } from './item-lifecycle.service.interface'
 
 // ---------------------------------------------------------------------------
 // ItemLifecycleService
@@ -50,7 +38,7 @@ export interface LifecycleResult {
  *    - Partially consumed → status stays `'active'`, `quantity_remaining` reduced.
  * 4. Build and return `{ itemUpdate, eventInsert }` — **no Supabase calls**.
  */
-export class ItemLifecycleService {
+export class ItemLifecycleService implements IItemLifecycleService {
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
@@ -63,7 +51,7 @@ export class ItemLifecycleService {
    * @param now - Optional timestamp override for deterministic tests.
    * @returns The item update and event insert to persist atomically.
    */
-  static markUsed(item: ItemRow, action: QuantityAction, now?: Date): LifecycleResult {
+  markUsed(item: ItemRow, action: QuantityAction, now?: Date): LifecycleResult {
     return ItemLifecycleService._apply(item, action, 'used', now)
   }
 
@@ -75,7 +63,7 @@ export class ItemLifecycleService {
    * @param now - Optional timestamp override for deterministic tests.
    * @returns The item update and event insert to persist atomically.
    */
-  static markWasted(item: ItemRow, action: QuantityAction, now?: Date): LifecycleResult {
+  markWasted(item: ItemRow, action: QuantityAction, now?: Date): LifecycleResult {
     return ItemLifecycleService._apply(item, action, 'wasted', now)
   }
 

@@ -21,6 +21,8 @@ const TOKEN_REGEX = /^[a-zA-Z0-9_-]{32}$/
  */
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
 
+import type { IInviteToken } from './invite-token.value-object.interface'
+
 // ---------------------------------------------------------------------------
 // InviteToken
 // ---------------------------------------------------------------------------
@@ -43,7 +45,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
  * await supabase.from('kitchen_invites').insert({ token: token.value, ... })
  * ```
  */
-export class InviteToken {
+export class InviteToken implements IInviteToken {
   private constructor(private readonly _token: string) {}
 
   // ---------------------------------------------------------------------------
