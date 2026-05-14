@@ -1,3 +1,12 @@
+/**
+ * @file ai.schema.ts — Zod schemas for Gemini AI responses and RAG document records.
+ *
+ * @remarks
+ * `GeminiAnalyseResponseSchema` is a discriminated union on `pass` — the EF
+ * returns either a full analysis or a moderation rejection. The client
+ * discriminates on `response.pass` before reading any other fields.
+ */
+
 import { z } from 'zod'
 
 import { ItemTagSchema } from './item.schema'

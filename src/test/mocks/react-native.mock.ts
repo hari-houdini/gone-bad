@@ -1,5 +1,5 @@
 /**
- * @file react-native.ts — Vitest module alias for react-native.
+ * @file react-native.mock.ts — Vitest module alias for react-native.
  *
  * @remarks
  * `react-native/index.js` contains Flow type annotations (`import typeof`)

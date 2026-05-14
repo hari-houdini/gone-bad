@@ -1,3 +1,12 @@
+/**
+ * @file item.schema.ts — Zod schemas and inferred types for the `items` and `item_events` tables.
+ *
+ * @remarks
+ * `ItemRowSchema` is the single source of truth for the item shape. All
+ * insert, update, and factory types are derived from it via `.omit()` /
+ * `.partial()` to prevent silent drift.
+ */
+
 import { z } from 'zod'
 
 // ---------------------------------------------------------------------------

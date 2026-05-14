@@ -1,3 +1,12 @@
+/**
+ * @file kitchen.schema.ts — Zod schemas for kitchens, kitchen_members, and kitchen_invites.
+ *
+ * @remarks
+ * `KitchenRoleSchema` drives all permission checks via the `KitchenRole`
+ * value object. `KitchenInviteInsertSchema` intentionally omits `used_count`
+ * and `created_at` — these are server-managed fields.
+ */
+
 import { z } from 'zod'
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,11 @@
+/**
+ * @file tags.ts — ordered list of all 14 canonical food category tags.
+ *
+ * @remarks
+ * Derived from `ItemTagSchema.options` — this is the single source of truth.
+ * Updating the enum in `item.schema.ts` automatically updates this list.
+ */
+
 import { ItemTagSchema } from '@/shared/types'
 
 /**

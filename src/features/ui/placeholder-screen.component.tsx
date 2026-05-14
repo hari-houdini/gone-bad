@@ -18,6 +18,8 @@ import { Link, type Href } from 'expo-router'
 import React from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import { borderRadius, colors, fontSizes, spacing } from '@/constants/tokens'
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -99,32 +101,32 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   title: {
-    fontSize: 20,
+    fontSize: fontSizes.xl,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#687076',
-    marginBottom: 16,
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
   linkList: {
     width: '100%',
-    gap: 12,
+    gap: spacing.md,
   },
   link: {
-    fontSize: 15,
-    color: '#0a7ea4',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    fontSize: fontSizes.md,
+    color: colors.interactive,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: '#E6EAED',
-    borderRadius: 8,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
 })

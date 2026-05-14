@@ -1,3 +1,13 @@
+/**
+ * @file edge-functions.schema.ts — Zod request/response contracts shared between the client and every Deno Edge Function.
+ *
+ * @remarks
+ * These schemas are the single source of type truth for all six Edge Functions:
+ * `analyse-image`, `process-image`, `rag-query`, `handle-invite`,
+ * `generate-fun-fact`, and `send-notifications`. The Deno runtime imports them
+ * via relative path; the React Native client imports from `@/shared/types`.
+ */
+
 import { z } from 'zod'
 
 import { GeminiAnalyseResponseSchema } from './ai.schema'

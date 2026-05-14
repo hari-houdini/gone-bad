@@ -1,6 +1,11 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * @file theme.ts — Expo template colour and font constants (pre-tokens legacy file).
+ *
+ * @remarks
+ * This file ships with the Expo project template and is consumed by the
+ * default Expo components in `components/`. It predates `src/constants/tokens.ts`.
+ * Feature screens must import from `tokens.ts` instead — this file exists only
+ * to keep the boilerplate Expo UI components working until Phase 10 removes them.
  */
 
 import { Platform } from 'react-native';
@@ -25,7 +30,7 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
-};
+} as const
 
 export const Fonts = Platform.select({
   ios: {
@@ -37,17 +42,17 @@ export const Fonts = Platform.select({
     rounded: 'ui-rounded',
     /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
-  },
+  } as const,
   default: {
     sans: 'normal',
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
-  },
+  } as const,
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
     rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+  } as const,
+})

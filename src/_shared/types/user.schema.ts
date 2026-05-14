@@ -1,3 +1,12 @@
+/**
+ * @file user.schema.ts — Zod schemas for the `users` and `user_settings` tables.
+ *
+ * @remarks
+ * `UserInsertSchema` omits `auth_uid` and `created_at` — these are populated
+ * by the `handle_new_user()` trigger, never by direct client insert.
+ * `UserSettingsInsertSchema` omits `user_id` for the same reason.
+ */
+
 import { z } from 'zod'
 
 // ---------------------------------------------------------------------------

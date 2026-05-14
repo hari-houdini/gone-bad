@@ -1,4 +1,7 @@
 /**
+ * @file setup.ts — global Vitest setup, runs before every test file.
+ *
+ * @remarks
  * Global test setup — runs after the Vitest framework is installed,
  * before any test file executes.
  *

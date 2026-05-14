@@ -1,3 +1,12 @@
+/**
+ * @file notifications.schema.ts — Zod schemas for push_tokens, notification_log, and Expo push payloads.
+ *
+ * @remarks
+ * `ExpoPushPayloadSchema` is the canonical shape sent to the Expo push gateway.
+ * `NotificationLogInsert` intentionally omits `id` and `sent_at` — both are
+ * server-managed defaults.
+ */
+
 import { z } from 'zod'
 
 // ---------------------------------------------------------------------------
