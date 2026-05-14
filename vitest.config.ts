@@ -1,5 +1,5 @@
-import { defineConfig } from 'vitest/config'
 import path from 'node:path'
+import { defineConfig } from 'vitest/config'
 
 /**
  * Vitest configuration for the Gone Bad React Native project.
@@ -16,7 +16,7 @@ export default defineConfig({
       // Redirect react-native to a parseable stub. The real package contains
       // Flow type annotations (`import typeof`) that esbuild cannot parse.
       // This must come BEFORE the '@' catch-all so it is matched first.
-      'react-native': path.resolve(__dirname, 'src/test/mocks/react-native.ts'),
+      'react-native': path.resolve(__dirname, 'src/test/mocks/react-native.mock.ts'),
       // More-specific aliases MUST come before the catch-all '@' entry.
       '@/features': path.resolve(__dirname, 'src/features'),
       '@/shared': path.resolve(__dirname, 'src/_shared'),
