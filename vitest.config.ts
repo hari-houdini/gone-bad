@@ -13,6 +13,10 @@ import path from 'node:path'
 export default defineConfig({
   resolve: {
     alias: {
+      // Redirect react-native to a parseable stub. The real package contains
+      // Flow type annotations (`import typeof`) that esbuild cannot parse.
+      // This must come BEFORE the '@' catch-all so it is matched first.
+      'react-native': path.resolve(__dirname, 'src/test/mocks/react-native.ts'),
       // More-specific aliases MUST come before the catch-all '@' entry.
       '@/features': path.resolve(__dirname, 'src/features'),
       '@/shared': path.resolve(__dirname, 'src/_shared'),
